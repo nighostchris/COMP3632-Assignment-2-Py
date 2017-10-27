@@ -7,11 +7,7 @@ def padding_oracle(random_block):
     f = open("oraclebyte", "wb")
     for i in range(0, 32):
         f.write(chr(random_block[i]))
-<<<<<<< HEAD
-    result = subprocess.check_output(["python", "oracle", "oraclebyte"])
-=======
-    result = subprocess.check_output("python oracle ciphertext")
->>>>>>> d215d5982973380991f153b9462be07b06b7722d
+    result = subprocess.check_output("python oracle oraclebyte")
     if result == "1":
         return True
     return False
