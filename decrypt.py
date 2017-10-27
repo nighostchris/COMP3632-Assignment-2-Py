@@ -7,8 +7,8 @@ def padding_oracle(random_block):
     print random_block
     f = open("oraclebyte", "wb")
     for i in range(0, 32):
-        f.write(char(random_block[i])
-    result = subprocess.check_output("oracle"])
+        f.write(chr(random_block[i]))
+    result = subprocess.check_output(["python", "oracle", "oraclebyte"])
     if result == "1":
         return True
     return False
@@ -80,7 +80,7 @@ def decrypt(iv, y):
 # input the ciphertext file
 try:
     filename = sys.argv[1]
-    f = open(filename, "r")
+    f = open(filename, "rb")
 except:
     print "ciphertext file cannot be open."
     sys.exit(1)
@@ -91,14 +91,18 @@ ctext = f.read()
 temp_iv = ctext[0:16]
 iv = []
 for i in range(0, 16):
-    iv.append(int(temp_iv[i].encode('hex'), 16))
+    iv.append(ord(temp_iv[i]))
+
+print iv
+
 ciphertext = ctext[16:]
 temp_num = []
 for i in range(0, len(ciphertext)):
-    temp_num.append(int(ciphertext[i].encode('hex'), 16))
+    temp_num.append(ord(ciphertext[i]))
 ciphertext = [temp_num[i:i+16] for i in range(0, len(temp_num), 16)]
 
 print ciphertext
+
 # print the result plaintext
 plaintext = decrypt(iv, ciphertext)
 output = []
