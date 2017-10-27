@@ -4,17 +4,21 @@ import random
 
 # calling padding oracle function
 def padding_oracle(random_block):
-    print random_block
     f = open("oraclebyte", "wb")
     for i in range(0, 32):
         f.write(chr(random_block[i]))
+<<<<<<< HEAD
     result = subprocess.check_output(["python", "oracle", "oraclebyte"])
+=======
+    result = subprocess.check_output("python oracle ciphertext")
+>>>>>>> d215d5982973380991f153b9462be07b06b7722d
     if result == "1":
         return True
     return False
 
 # taking in 16 bytes of ciphertext
 def decrypt_byte(y):
+    print "decrypt_byte"
     random_block = []
 
     # generate first random 15 bytes in integer
@@ -37,6 +41,7 @@ def decrypt_byte(y):
     return random_block[15] ^ 1                         # return i xor 1 if always return true
 
 def decrypt_block(y):
+    print "decrypt_block"
     decrypted_block = []
     random_block = []
 
@@ -105,6 +110,7 @@ print ciphertext
 
 # print the result plaintext
 plaintext = decrypt(iv, ciphertext)
+print plaintext
 output = []
 for i in range(0, len(plaintext)):
     for j in range(0, 16):
