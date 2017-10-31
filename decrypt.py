@@ -4,10 +4,13 @@ import random
 
 # calling padding oracle function
 def padding_oracle(random_block):
+    print random_block
     f = open("oraclebyte", "wb")
     for i in range(0, 32):
         f.write(chr(random_block[i]))
-    result = subprocess.check_output("python oracle oraclebyte")
+    f.close()
+    result = subprocess.check_output("python oracle oraclebyte", shell=True)
+    print result
     if result == "1":
         return True
     return False
@@ -29,6 +32,7 @@ def decrypt_byte(y):
     while padding_oracle(random_block) == False:
         random_block[15] += 1
 
+    print "haha"
     # repeat replacing the first 15 bytes until padding oracle returns true for all bytes
     for i in range(0, 15):
         random_block[i] = random.randint(0, 256)
