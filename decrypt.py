@@ -1,118 +1,106 @@
+import os
 import sys
 import subprocess
-import random
 
-# calling padding oracle function
-def padding_oracle(random_block):
-    print random_block
-    f = open("oraclebyte", "wb")
-    for i in range(0, 32):
-        f.write(chr(random_block[i]))
-    f.close()
-    result = subprocess.check_output("python oracle oraclebyte", shell=True)
-    print result
-    if result == "1":
-        return True
-    return False
+# Call oracle function to check validity of r|yN
+# return true if oracle returns 1
+def padding_oracle(rplusyN):
+	# write the 32 bytes to file call oraclebyte for checking
+	f = open("oraclebyte", "wb")
+	f.write(rplusyN)
+	f.close()
 
-# taking in 16 bytes of ciphertext
+	# call oracle function
+	result = subprocess.check_output("python oracle oraclebyte", shell=True)
+	if (int(result) == 1):
+		return True
+	return False
+
+# get the i value upon success of padding oracle check
+def get_byte_i(r, k, y):
+	# generate first 15 random bytes
+	i = 0
+	r = r[:k-1] + chr(i) + r[k:]
+
+	# concat with the block y which consists of 16 bytes
+	rplusyN = r + y
+	result = padding_oracle(rplusyN)
+
+	# keep increase i until padding oracle returns valid result
+	while (result == False):
+		i += 1
+		rplusyN = r[:k-1] + chr(i) + r[k:] + y
+		result = padding_oracle(rplusyN)
+	return (i, rplusyN)
+
 def decrypt_byte(y):
-    print "decrypt_byte"
-    random_block = []
+	# generate first 15 random bytes
+	r = bytearray(os.urandom(15)) + chr(0)
+	(i, rplusyN) = get_byte_i(r, 16, y)
 
-    # generate first random 15 bytes in integer
-    for i in range(0, 15):
-        random_block.append(random.randint(0, 256))
+	# keep replacing byte start from r0
+	replace = 0
+	k = replace + 1
+	newrplusyN = bytearray(os.urandom(1)) + rplusyN[1:]
+	result = padding_oracle(newrplusyN)
+	while ((result == True) and (k < 15)):
+		replace += 1
+		k = replace + 1
+		newrplusyN = newrplusyN[:replace] + bytearray(os.urandom(1)) + newrplusyN[replace+1:]
+		result = padding_oracle(newrplusyN)
+	replace += 1
+	return (i ^ (17 - replace - 1), r)
 
-    # initialize i as 0 and concatentate with y
-    random_block.append(0)
-    random_block += y
+def decrypt_block(y, number):
+	# D(yN)
+	decrypted_block = bytearray(16)
+	# xN
+	plaintext_block = bytearray(16)
+	
+	# get the last decrypted byte and get the last plaintext char
+	(decrypted_block[15], r) = decrypt_byte(y)
+	plaintext_block[15] = decrypted_block[15] ^ int(ciphertext[number-1][15].encode('hex'), 16)
 
-    # check with padding oracle until returns true
-    while padding_oracle(random_block) == False:
-        random_block[15] += 1
+	# decrypt one block = 16 bytes
+	for k in range(15, 0, -1):
+		r = r[:k-1] + chr(0)
+		for m in range(k, 16):
+			r = r + chr(decrypted_block[m] ^ (17 - k))
+		(i, rplusyN) = get_byte_i(r, k, y)
 
-    print "haha"
-    # repeat replacing the first 15 bytes until padding oracle returns true for all bytes
-    for i in range(0, 15):
-        random_block[i] = random.randint(0, 256)
-        if padding_oracle(random_block) == False:
-            return random_block[15] ^ (17 - (i + 1))    # return i xor 17 - the kth random byte
-    return random_block[15] ^ 1                         # return i xor 1 if always return true
+		decrypted_block[k-1] = i ^ (17 - k)
+		plaintext_block[k-1] = decrypted_block[k-1] ^ int(ciphertext[number-1][k-1].encode('hex'), 16)
 
-def decrypt_block(y):
-    print "decrypt_block"
-    decrypted_block = []
-    random_block = []
+	for j in range(len(plaintext_block)):
+		answer[(number-1) * 16 + j] = chr(plaintext_block[j])
 
-    # generate random block
-    for i in range(0, 15):
-        random_block.append(random.randint(0, 256))
-        decrypted_block.append("")
-    random_block.append(0)
-    random_block += y
-    decrypted_block.append(decrypt_byte(y))          # last byte decrypted from y
-
-    # replace the random byte from the byte we want to decrypt
-    for i in range(14, -1, -1):
-        for j in range(15, i, -1):
-            random_block[j] = decrypted_block[j] ^ (17 - (i + 1))   # replacing byte greater than i
-        random_block[i] = 0;                                        # initially i is 0
-        while padding_oracle(random_block) == False:
-            random_block[i] += 1
-        decrypted_block[i] = random_block[i] ^ (17 - (i + 1))
-    return decrypted_block
-
-def decrypt(iv, y):
-    plaintext = []
-
-    # decrypt block by block from the end except the first block
-    for i in range(len(y)-1, 0, -1):
-        temp = []
-        decrypted_block = decrypt_block(y[i])                       # get yi
-        for j in range(0, 16):
-            temp.append(decrypted_block[j] ^ y[i-1][j])             # byte by byte xor previous non-decrypt block
-        plaintext.append(temp)
-    
-    #handle the first block
-    temp = []
-    decrypted_block = decrypt_block(y[0])
-    for i in range(0, 16):
-        temp.append(decrypted_block[i] ^ iv[i])
-    plaintext.append(temp)
-    return plaintext
+# decrypt all blocks except the iv
+def decrypt():
+	for block in range(len(ciphertext)-1, 0, -1):
+		decrypt_block(ciphertext[block], block)
 
 # input the ciphertext file
 try:
-    filename = sys.argv[1]
-    f = open(filename, "rb")
+	filename = sys.argv[1]
+	f = open(filename, "rb")
 except:
-    print "ciphertext file cannot be open."
-    sys.exit(1)
+	print "Ciphertext file cannot be opened."
+	sys.exit(1)
 
 ctext = f.read()
+f.close()
 
-# get the iv and ciphertext in integer form
-temp_iv = ctext[0:16]
-iv = []
-for i in range(0, 16):
-    iv.append(ord(temp_iv[i]))
+# Split the ciphertext into blocks of 16 bytes
+ciphertext = []
+for i in range(0, len(ctext), 16):
+	ciphertext.append(ctext[i:i+16])
 
-print iv
+# open up an array to store answer
+answer = bytearray(len(ctext) - 16)
 
-ciphertext = ctext[16:]
-temp_num = []
-for i in range(0, len(ciphertext)):
-    temp_num.append(ord(ciphertext[i]))
-ciphertext = [temp_num[i:i+16] for i in range(0, len(temp_num), 16)]
-
-print ciphertext
-
-# print the result plaintext
-plaintext = decrypt(iv, ciphertext)
-print plaintext
-output = []
-for i in range(0, len(plaintext)):
-    for j in range(0, 16):
-        output.append(chr(plaintext[i][j]))
-print output
+# start decrypt
+decrypt()
+	
+# output plaintext
+answer = "".join(chr(i) for i in answer)
+print "Plaintext: " + answer
